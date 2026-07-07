@@ -194,4 +194,3 @@ To prevent unbounded storage growth in Azure Container Registry:
 - **Trivy** — Scans images for known vulnerabilities
 
 ---
-*Built with ❤️ for DevOps Certification*
