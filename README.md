@@ -192,3 +192,6 @@ To prevent unbounded storage growth in Azure Container Registry:
 - **Azure Container Registry (ACR)** — Stores versioned, tagged container images
 - **GitHub Actions** — Builds, tests, scans, and pushes Docker images
 - **Trivy** — Scans images for known vulnerabilities
+
+---
+*Built with ❤️ for DevOps Certification*
