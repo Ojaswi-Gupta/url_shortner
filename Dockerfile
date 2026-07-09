@@ -5,7 +5,7 @@
 # image small (~150MB vs ~1GB for the full image).
 # This matters for ACR storage costs and pipeline speed.
 
-FROM python:3.12-slim
+FROM python:3.12-alpine
 
 # Metadata labels — useful for image inspection and ACR management
 LABEL maintainer="team-devops"

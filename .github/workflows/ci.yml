@@ -1,0 +1,137 @@
+name: CI Pipeline
+
+on:
+  push:
+
+env:
+  IMAGE_NAME: url-shortener
+
+jobs:
+  test:
+    name: Run Application Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest tests/ -v
+
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Generate image tags
+        id: tags
+        shell: bash
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          BUILD_TAG="build-${GITHUB_RUN_NUMBER}"
+          SHA_TAG="sha-${SHORT_SHA}"
+
+          echo "BUILD_TAG=${BUILD_TAG}" >> "$GITHUB_ENV"
+          echo "SHA_TAG=${SHA_TAG}" >> "$GITHUB_ENV"
+
+          echo "build_tag=${BUILD_TAG}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
+
+          echo "Build tag: ${BUILD_TAG}"
+          echo "SHA tag: ${SHA_TAG}"
+
+      - name: Build Docker image
+        run: |
+          docker build \
+            --pull \
+            -t "${IMAGE_NAME}:${BUILD_TAG}" \
+            -t "${IMAGE_NAME}:${SHA_TAG}" \
+            .
+
+      - name: Verify Docker image tags
+        run: |
+          docker image inspect "${IMAGE_NAME}:${BUILD_TAG}"
+          docker image inspect "${IMAGE_NAME}:${SHA_TAG}"
+
+      - name: Run Docker container
+        run: |
+          docker run -d \
+            --name url-shortener-health-test \
+            -p 8000:8000 \
+            "${IMAGE_NAME}:${BUILD_TAG}"
+
+      - name: Wait for application to become healthy
+        run: |
+          for attempt in {1..10}; do
+            if curl --fail --silent http://localhost:8000/health; then
+              echo
+              echo "Health check passed"
+              exit 0
+            fi
+
+            echo "Waiting for application... attempt ${attempt}/10"
+            sleep 2
+          done
+
+          echo "Health check failed"
+          docker logs url-shortener-health-test
+          exit 1
+
+      - name: Stop test container
+        if: always()
+        run: |
+          docker rm -f url-shortener-health-test || true
+
+      - name: Scan Docker image for CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.build_tag }}"
+          format: "table"
+          scanners: "vuln"
+          severity: "CRITICAL"
+          exit-code: "1"
+      
+      - name: Log in to Azure
+        uses: azure/login@v2
+        with:
+          creds: >-
+            {
+              "clientId": "${{ secrets.AZURE_CLIENT_ID }}",
+              "clientSecret": "${{ secrets.AZURE_CLIENT_SECRET }}",
+              "subscriptionId": "${{ secrets.AZURE_SUBSCRIPTION_ID }}",
+              "tenantId": "${{ secrets.AZURE_TENANT_ID }}"
+            }
+
+      - name: Log in to Azure Container Registry
+        run: az acr login --name pranithacr2026
+
+      - name: Tag Docker images for ACR
+        run: |
+          docker tag \
+            "${IMAGE_NAME}:${BUILD_TAG}" \
+            "pranithacr2026.azurecr.io/${IMAGE_NAME}:${BUILD_TAG}"
+
+          docker tag \
+            "${IMAGE_NAME}:${SHA_TAG}" \
+            "pranithacr2026.azurecr.io/${IMAGE_NAME}:${SHA_TAG}"
+
+      - name: Push Docker images to ACR
+        run: |
+          docker push \
+            "pranithacr2026.azurecr.io/${IMAGE_NAME}:${BUILD_TAG}"
+
+          docker push \
+            "pranithacr2026.azurecr.io/${IMAGE_NAME}:${SHA_TAG}"
