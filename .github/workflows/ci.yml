@@ -55,3 +55,32 @@ jobs:
         run: |
           docker image inspect "${IMAGE_NAME}:${BUILD_TAG}"
           docker image inspect "${IMAGE_NAME}:${SHA_TAG}"
+      
+      - name: Run Docker container
+        run: |
+          docker run -d \
+            --name url-shortener-health-test \
+            -p 8000:8000 \
+            "${IMAGE_NAME}:${BUILD_TAG}"
+
+      - name: Wait for application to become healthy
+        run: |
+          for attempt in {1..10}; do
+            if curl --fail --silent http://localhost:8000/health; then
+              echo
+              echo "Health check passed"
+              exit 0
+            fi
+
+            echo "Waiting for application... attempt ${attempt}/10"
+            sleep 2
+          done
+
+          echo "Health check failed"
+          docker logs url-shortener-health-test
+          exit 1
+
+      - name: Stop test container
+        if: always()
+        run: |
+          docker rm -f url-shortener-health-test || true
