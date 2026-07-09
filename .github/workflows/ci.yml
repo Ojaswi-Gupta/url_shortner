@@ -38,11 +38,20 @@ jobs:
 
       - name: Generate image tags
         id: tags
+        shell: bash
         run: |
           SHORT_SHA="${GITHUB_SHA::7}"
+          BUILD_TAG="build-${GITHUB_RUN_NUMBER}"
+          SHA_TAG="sha-${SHORT_SHA}"
 
-          echo "BUILD_TAG=build-${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-          echo "SHA_TAG=sha-${SHORT_SHA}" >> "$GITHUB_ENV"
+          echo "BUILD_TAG=${BUILD_TAG}" >> "$GITHUB_ENV"
+          echo "SHA_TAG=${SHA_TAG}" >> "$GITHUB_ENV"
+
+          echo "build_tag=${BUILD_TAG}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
+
+          echo "Build tag: ${BUILD_TAG}"
+          echo "SHA tag: ${SHA_TAG}"
 
       - name: Build Docker image
         run: |
@@ -55,7 +64,7 @@ jobs:
         run: |
           docker image inspect "${IMAGE_NAME}:${BUILD_TAG}"
           docker image inspect "${IMAGE_NAME}:${SHA_TAG}"
-      
+
       - name: Run Docker container
         run: |
           docker run -d \
@@ -84,3 +93,11 @@ jobs:
         if: always()
         run: |
           docker rm -f url-shortener-health-test || true
+
+      - name: Scan Docker image for CRITICAL vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ env.IMAGE_NAME }}:${{ steps.tags.outputs.build_tag }}"
+          format: "table"
+          severity: "CRITICAL"
+          exit-code: "1"
