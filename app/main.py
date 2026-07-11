@@ -150,3 +150,16 @@ def get_url_stats(code: str, db: Session = Depends(get_db)):
         clicks=url_entry.clicks,
         created_at=url_entry.created_at,
     )
+
+
+@app.get("info", tags=["Health"])
+def service_info():
+    """
+    Return basic information about the running services
+    """
+    return {
+        "service": "URL Shortener",
+        "version": APP_VERSION,
+        "environment": "production",
+        "pipeline": "GitHub Actions CI with Trivy security scanning"
+    }
