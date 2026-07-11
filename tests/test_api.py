@@ -80,7 +80,7 @@ def test_health_returns_200():
 
     data = response.json()
     assert data["status"] == "healthy"
-    assert data["version"] == "1.0.0"
+    assert data["version"] == "1.0.1"
 
 
 # ---------------------------------------------------------------------------

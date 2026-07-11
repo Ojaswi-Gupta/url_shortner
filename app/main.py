@@ -23,7 +23,7 @@ from app.schemas import URLCreate, URLResponse, URLStats, HealthResponse
 from app.utils import generate_short_code
 
 # Application version — used in /health and for image tagging
-APP_VERSION = "1.0.0"
+APP_VERSION = "1.0.1"
 
 # Create all database tables on startup
 Base.metadata.create_all(bind=engine)
